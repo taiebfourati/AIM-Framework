@@ -1,0 +1,55 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- IDE ---
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- MLflow tracking (regenerable, can grow to GB) ---
+mlruns/
+mlflow.db
+mlflow_dashboard.db
+mlartifacts/
+
+# --- OMNeT++ / Simu5G binary results (huge, regenerable) ---
+*.vec
+*.vci
+*.sca
+simu5g/results/*.vec
+
+# --- Logs ---
+*.log
+*.err.log
+*.out.log
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Local artefacts ---
+.repro_audit_*/
+.figures_pre_repro_audit/
+*.synctex*
+texput.log

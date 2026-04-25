@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIMP × Simu5G — Live Dashboard v2</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body class="v2">
+
+  <!-- ─── Top bar ────────────────────────────────────────────────────── -->
+  <header class="topbar">
+    <div class="brand-block">
+      <div class="brand-mark"></div>
+      <div class="brand-text">
+        <div class="title-row">
+          <span class="brand">AIMP</span>
+          <span class="sep">×</span>
+          <span class="brand2">Simu5G</span>
+          <span class="ver-tag">v2</span>
+        </div>
+        <div class="subtitle">live framework observer · RTP / ATM / MTP / AIF</div>
+      </div>
+    </div>
+
+    <div class="status-block">
+      <div id="status-badge" class="status">Idle</div>
+      <div class="kpi-mini">
+        <span class="lbl">step</span><b id="fs-step">0</b>
+      </div>
+      <div class="kpi-mini">
+        <span class="lbl">acc</span><b id="fs-acc">0.0%</b>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="ctrl-cluster">
+        <button id="btn-start"  class="btn btn-go"   title="Start engine">▶ Start</button>
+        <button id="btn-pause"  class="btn"          title="Pause sample loop">⏸</button>
+        <button id="btn-resume" class="btn"          title="Resume sample loop">▶▶</button>
+        <button id="btn-stop"   class="btn btn-stop" title="Stop engine">■</button>
+        <button id="btn-reset"  class="btn"          title="Reset counters &amp; buffers">⟲</button>
+      </div>
+      <div class="rate">
+        <label>Rate</label>
+        <input id="rate-slider" type="range" min="1" max="200" value="30" />
+        <span id="rate-label">30 Hz</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─── Boot overlay (shown during _build_pipeline) ────────────────── -->
+  <div id="boot-overlay" class="boot-overlay" hidden>
+    <div class="boot-card">
+      <div class="boot-spinner"></div>
+      <div class="boot-title">Booting engine…</div>
+      <div class="boot-sub" id="boot-sub">
+        loading Simu5G corpus · fitting detector reference · training initial MLIN
+      </div>
+      <div class="boot-bar"><div class="boot-bar-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- ─── Main grid ──────────────────────────────────────────────────── -->
+  <main class="grid">
+
+    <!-- ─── Column 1 — control surface ─── -->
+    <section class="panel panel-controls">
+
+      <details class="card" open>
+        <summary><span class="card-title">Drift Injection</span><span class="chev">›</span></summary>
+        <p class="hint">Per-sample perturbations applied before RTP sees the row.</p>
+
+        <div class="control">
+          <div class="control-row"><label>SINR bias</label><span id="sinr-val" class="val">0.0 dB</span></div>
+          <input id="sinr-slider" type="range" min="-30" max="10" step="0.5" value="0" />
+        </div>
+        <div class="control">
+          <div class="control-row"><label>RSRP bias</label><span id="rsrp-val" class="val">0.0 dB</span></div>
+          <input id="rsrp-slider" type="range" min="-40" max="10" step="0.5" value="0" />
+        </div>
+        <div class="control">
+          <div class="control-row"><label>Delay bias</label><span id="delay-val" class="val">0.0 ms</span></div>
+          <input id="delay-slider" type="range" min="-5" max="60" step="0.5" value="0" />
+        </div>
+        <div class="control">
+          <div class="control-row"><label>Throughput scale</label><span id="tput-val" class="val">1.00×</span></div>
+          <input id="tput-slider" type="range" min="0.05" max="2.0" step="0.01" value="1" />
+        </div>
+        <div class="control">
+          <div class="control-row"><label>Noise scale</label><span id="noise-val" class="val">1.0×</span></div>
+          <input id="noise-slider" type="range" min="1" max="5" step="0.1" value="1" />
+        </div>
+
+        <div class="toggles">
+          <label class="switch">
+            <input type="checkbox" id="poison-toggle" />
+            <span class="slider"></span>
+            <span class="label">Poison mode <span class="hint-inline">(3-5σ outliers)</span></span>
+          </label>
+        </div>
+
+        <div class="presets">
+          <button class="btn btn-pre" data-preset="normal">Normal</button>
+          <button class="btn btn-pre" data-preset="mild-drift">Mild drift</button>
+          <button class="btn btn-pre" data-preset="heavy-drift">Heavy drift</button>
+          <button class="btn btn-pre" data-preset="latency-storm">Latency storm</button>
+          <button class="btn btn-pre btn-pre-danger" data-preset="poison">Poison</button>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary><span class="card-title">RAN Scenario</span><span class="chev">›</span></summary>
+        <p class="hint">CSV replay = static Simu5G corpus. Live = mutable RAN simulator with closed-loop actuator.</p>
+        <div class="toggles mode-toggles">
+          <label class="switch">
+            <input type="checkbox" id="live-mode-toggle" />
+            <span class="slider"></span>
+            <span class="label">Live RAN simulator <span class="hint-inline">(off = CSV replay)</span></span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="actuator-toggle" disabled />
+            <span class="slider"></span>
+            <span class="label">Closed-loop actuator <span class="hint-inline">(live only)</span></span>
+          </label>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary><span class="card-title">Retraining Policy</span><span class="chev">›</span></summary>
+        <div class="mode-group">
+          <div class="control-row"><label>MTP variant</label><span id="variant-val" class="val">AUTO</span></div>
+          <select id="variant-select" class="select">
+            <option value="AUTO">AUTO (let composer pick)</option>
+            <option value="LOCAL">MTP-L · local, fast RF fine-tune</option>
+            <option value="EXTERNAL">MTP-E · MLflow-logged, tuned</option>
+            <option value="CLOUD">MTP-C · heavy GB + GridSearch</option>
+          </select>
+        </div>
+        <div class="toggles mode-toggles">
+          <label class="switch">
+            <input type="checkbox" id="closed-loop-toggle" />
+            <span class="slider"></span>
+            <span class="label">Closed-loop <span class="hint-inline">(decay injection after retrain)</span></span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="golden-ndt-toggle" checked />
+            <span class="slider"></span>
+            <span class="label">Golden-holdout NDT <span class="hint-inline">(ground truth)</span></span>
+          </label>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary><span class="card-title">Manual</span><span class="chev">›</span></summary>
+        <div class="manual">
+          <button id="btn-force-retrain" class="btn btn-warn">⚙ Force retrain</button>
+        </div>
+      </details>
+
+    </section>
+
+    <!-- ─── Column 2 — telemetry ─── -->
+    <section class="panel panel-telemetry">
+
+      <div class="section-head">
+        <h2>5G KPI stream</h2>
+        <span class="head-tag">window: <b id="kpi-win">500</b> samples</span>
+      </div>
+
+      <div class="hero-grid">
+        <div class="hero-tile" data-tile="rsrp">
+          <div class="hero-head">
+            <span class="hero-lbl">RSRP</span>
+            <span class="hero-unit">dBm</span>
+          </div>
+          <div class="hero-val-row">
+            <span class="hero-val" id="hero-rsrp">—</span>
+            <span class="hero-trend" id="trend-rsrp"></span>
+          </div>
+          <div class="hero-chart"><canvas id="chart-rsrp"></canvas></div>
+        </div>
+        <div class="hero-tile" data-tile="sinr">
+          <div class="hero-head">
+            <span class="hero-lbl">SINR</span>
+            <span class="hero-unit">dB</span>
+          </div>
+          <div class="hero-val-row">
+            <span class="hero-val" id="hero-sinr">—</span>
+            <span class="hero-trend" id="trend-sinr"></span>
+          </div>
+          <div class="hero-chart"><canvas id="chart-sinr"></canvas></div>
+        </div>
+        <div class="hero-tile" data-tile="tput">
+          <div class="hero-head">
+            <span class="hero-lbl">Throughput</span>
+            <span class="hero-unit">Mbps</span>
+          </div>
+          <div class="hero-val-row">
+            <span class="hero-val" id="hero-tput">—</span>
+            <span class="hero-trend" id="trend-tput"></span>
+          </div>
+          <div class="hero-chart"><canvas id="chart-tput"></canvas></div>
+        </div>
+        <div class="hero-tile" data-tile="delay">
+          <div class="hero-head">
+            <span class="hero-lbl">Delay</span>
+            <span class="hero-unit">ms</span>
+          </div>
+          <div class="hero-val-row">
+            <span class="hero-val" id="hero-delay">—</span>
+            <span class="hero-trend" id="trend-delay"></span>
+          </div>
+          <div class="hero-chart"><canvas id="chart-delay"></canvas></div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <h2>RTP detectors</h2>
+        <span class="head-tag">data &amp; concept · clean &amp; poisoning</span>
+      </div>
+      <div class="detector-grid">
+        <div class="det-card" id="det-ddd">
+          <div class="det-head">
+            <span class="det-tag">DDD</span>
+            <span class="det-pill">idle</span>
+          </div>
+          <div class="det-title">Data Drift</div>
+          <div class="det-metric" id="ddd-metric">—</div>
+          <div class="det-sub">KS p-max · MMD²</div>
+          <div class="det-state">idle</div>
+        </div>
+        <div class="det-card" id="det-dpd">
+          <div class="det-head">
+            <span class="det-tag">DPD</span>
+            <span class="det-pill">idle</span>
+          </div>
+          <div class="det-title">Data Poisoning</div>
+          <div class="det-metric" id="dpd-metric">—</div>
+          <div class="det-sub">IF rate · Mahal max</div>
+          <div class="det-state">idle</div>
+        </div>
+        <div class="det-card" id="det-cdd">
+          <div class="det-head">
+            <span class="det-tag">CDD</span>
+            <span class="det-pill">idle</span>
+          </div>
+          <div class="det-title">Concept Drift</div>
+          <div class="det-metric" id="cdd-metric">—</div>
+          <div class="det-sub">PH stat · perf drop</div>
+          <div class="det-state">idle</div>
+        </div>
+        <div class="det-card" id="det-cpd">
+          <div class="det-head">
+            <span class="det-tag">CPD</span>
+            <span class="det-pill">idle</span>
+          </div>
+          <div class="det-title">Concept Poisoning</div>
+          <div class="det-metric" id="cpd-metric">—</div>
+          <div class="det-sub">shadow divergence</div>
+          <div class="det-state">idle</div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <h2>Rolling accuracy</h2>
+        <span class="head-tag">window: last 200 samples</span>
+      </div>
+      <div class="chart-card accuracy-card">
+        <canvas id="chart-acc"></canvas>
+      </div>
+
+    </section>
+
+    <!-- ─── Column 3 — framework state ─── -->
+    <section class="panel panel-framework">
+
+      <div class="section-head">
+        <h2>Model lineage</h2>
+        <span class="head-tag" id="model-count">—</span>
+      </div>
+      <div id="model-timeline" class="timeline"></div>
+
+      <div class="section-head"><h2>AIF slots</h2></div>
+      <div class="slots">
+        <div class="slot slot-active" id="slot-mlin">
+          <div class="slot-head">MLIN <span class="slot-state">active</span></div>
+          <div class="slot-body"><span class="slot-ver">v1</span></div>
+        </div>
+        <div class="slot" id="slot-mlio">
+          <div class="slot-head">MLIO <span class="slot-state">standby</span></div>
+          <div class="slot-body"><span class="slot-ver">—</span></div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <h2>NDT scoreboard</h2>
+        <span class="head-tag">last validation</span>
+      </div>
+      <div class="ndt-dual">
+        <div class="ndt-col">
+          <div class="ndt-head">Pseudo-label (biased)</div>
+          <div class="ndt-row"><span class="ndt-lbl">base</span><span id="ndt-ps-base" class="ndt-v">—</span></div>
+          <div class="ndt-row"><span class="ndt-lbl">candidate</span><span id="ndt-ps-cand" class="ndt-v">—</span></div>
+          <div class="ndt-row"><span class="ndt-lbl">Δ</span><span id="ndt-ps-delta" class="ndt-v">—</span></div>
+        </div>
+        <div class="ndt-col ndt-golden">
+          <div class="ndt-head">Golden-holdout (truth)</div>
+          <div class="ndt-row"><span class="ndt-lbl">base</span><span id="ndt-gt-base" class="ndt-v">—</span></div>
+          <div class="ndt-row"><span class="ndt-lbl">candidate</span><span id="ndt-gt-cand" class="ndt-v">—</span></div>
+          <div class="ndt-row"><span class="ndt-lbl">Δ</span><span id="ndt-gt-delta" class="ndt-v">—</span></div>
+        </div>
+      </div>
+      <div class="ndt-bias-row">
+        <span class="ndt-lbl">Pseudo-label bias</span>
+        <span id="ndt-bias" class="ndt-v">—</span>
+      </div>
+
+      <div class="section-head">
+        <h2>Closed-loop RAN <span id="ran-mode-badge" class="ran-mode-badge mode-csv">CSV REPLAY</span></h2>
+      </div>
+      <div id="ran-panel" class="ran-panel ran-panel-disabled">
+        <div class="ran-summary">
+          <div class="ran-stat">
+            <span class="ran-stat-lbl">Actuator</span>
+            <span id="ran-actuator-state" class="ran-stat-val ran-actuator-off">OFF</span>
+          </div>
+          <div class="ran-stat">
+            <span class="ran-stat-lbl">Fired / Suppressed</span>
+            <span id="ran-fire-count" class="ran-stat-val">0 / 0</span>
+          </div>
+        </div>
+        <div class="ran-state-grid">
+          <div class="ran-cell"><div class="ran-cell-lbl">TX offset</div><div id="ran-tx-offset" class="ran-cell-val">+0.0 dB</div></div>
+          <div class="ran-cell"><div class="ran-cell-lbl">Interf. null</div><div id="ran-interf-offset" class="ran-cell-val">+0.0 dB</div></div>
+          <div class="ran-cell"><div class="ran-cell-lbl">Sched boost</div><div id="ran-sched-boost" class="ran-cell-val">0.0 ms</div></div>
+          <div class="ran-cell"><div class="ran-cell-lbl">MCS robust.</div><div id="ran-mcs-robust" class="ran-cell-val">0.00</div></div>
+          <div class="ran-cell"><div class="ran-cell-lbl">Serving cell</div><div id="ran-cell-id" class="ran-cell-val">#1</div></div>
+          <div class="ran-cell"><div class="ran-cell-lbl">UE distance</div><div id="ran-ue-dist" class="ran-cell-val">— m</div></div>
+        </div>
+        <div class="ran-effects-head">Active effects</div>
+        <div id="ran-effects" class="ran-effects-row"><span class="ran-effects-empty">none</span></div>
+        <div class="ran-effects-head">RAN action log</div>
+        <div id="ran-action-log" class="log-scroll compact"></div>
+      </div>
+
+      <div class="section-head"><h2>MToUT signals</h2></div>
+      <div id="mtout-log" class="log-scroll"><div class="log-empty">waiting for detector trigger… inject drift or click <b>Force retrain</b></div></div>
+
+      <div class="section-head"><h2>ATM retraining</h2></div>
+      <div id="retrain-log" class="log-scroll compact"><div class="log-empty">no retrains yet — fires after step 500, or via <b>Force retrain</b></div></div>
+
+    </section>
+  </main>
+
+  <footer class="statusbar">
+    <span id="footer-status">disconnected</span>
+    <span class="sp"></span>
+    <span>injections: <b id="fs-inj">none</b></span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
