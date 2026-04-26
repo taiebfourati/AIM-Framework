@@ -84,12 +84,6 @@ python simu5g_simulation.py
 streamlit run src/dashboard/app.py
 # or on Windows:
 dashboard.bat
-```
-
-> **Note**: `pip install -r requirements.txt` still works as a fallback if
-> you do not want an editable install, but in that case you will need to set
-> `PYTHONPATH=src` (or `cd src`) before running the entry-point scripts so
-> that imports like `from aif.aif import AIF` resolve correctly.
 
 ---
 
@@ -125,8 +119,6 @@ python thesis_figures/generate_eval_figures.py
 python thesis_figures/regenerate_evaluation.py
 ```
 
-Output PDFs are written to the working directory; copy them into the thesis
-`figures/` folder if you want to rebuild the LaTeX manuscript.
 
 ---
 
